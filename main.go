@@ -7,6 +7,8 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
+	"regexp"
 	"strings"
 )
 
@@ -15,17 +17,22 @@ func main() {
 	tweetFlag := flag.String("t", "empty", "tweet link")
 	flag.Parse()
 
-	fetchURL := GetTweetID(*tweetFlag)
+	if *tweetFlag == "empty" {
+		log.Fatal("Wrong Param!")
+	}
+
+	fetchURL, TweetId := GetTweetID(*tweetFlag)
 	guest_t := CreateGuestToken()
-	MakeRequest(fetchURL, guest_t)
+	vidURL := MakeRequest(fetchURL, guest_t)
+	SaveFile(TweetId, vidURL)
 }
 
-func GetTweetID(tweetURL string) string {
+func GetTweetID(tweetURL string) (string, string) {
 	id := strings.Split(tweetURL, "/")
-	return "https://api.x.com/graphql/OoJd6A50cv8GsifjoOHGfg/TweetResultByRestId?variables=%7BtweetId%3A%20%22" + id[5] + "%22%2C%20withCommunity%3A%20false%2C%20includePromotedContent%3A%20false%2C%20withVoice%3A%20false%2C%20%7D&features=%7B%20rweb_tipjar_consumption_enabled%3A%20false%2C%20responsive_web_graphql_exclude_directive_enabled%3A%20false%2C%20verified_phone_label_enabled%3A%20false%2C%20creator_subscriptions_tweet_preview_api_enabled%3A%20false%2C%20responsive_web_graphql_timeline_navigation_enabled%3A%20false%2C%20responsive_web_graphql_skip_user_profile_image_extensions_enabled%3A%20false%2C%20communities_web_enable_tweet_community_results_fetch%3A%20false%2C%20c9s_tweet_anatomy_moderator_badge_enabled%3A%20false%2C%20articles_preview_enabled%3A%20false%2C%20responsive_web_edit_tweet_api_enabled%3A%20false%2C%20graphql_is_translatable_rweb_tweet_is_translatable_enabled%3A%20false%2C%20view_counts_everywhere_api_enabled%3A%20false%2C%20longform_notetweets_consumption_enabled%3A%20false%2C%20responsive_web_twitter_article_tweet_consumption_enabled%3A%20false%2C%20tweet_awards_web_tipping_enabled%3A%20false%2C%20creator_subscriptions_quote_tweet_preview_enabled%3A%20false%2C%20freedom_of_speech_not_reach_fetch_enabled%3A%20false%2C%20standardized_nudges_misinfo%3A%20false%2C%20tweet_with_visibility_results_prefer_gql_limited_actions_policy_enabled%3A%20false%2C%20rweb_video_timestamps_enabled%3A%20false%2C%20longform_notetweets_rich_text_read_enabled%3A%20false%2C%20longform_notetweets_inline_media_enabled%3A%20false%2C%20responsive_web_enhance_cards_enabled%3A%20false%2C%20%7D&fieldToggles=%7B%20withArticleRichContentState%3A%20false%2C%20withArticlePlainText%3A%20false%2C%20withGrokAnalyze%3A%20false%2C%20withDisallowedReplyControls%3A%20false%2C%20%7D"
+	return "https://api.x.com/graphql/OoJd6A50cv8GsifjoOHGfg/TweetResultByRestId?variables=%7B%22tweetId%22%3A%22" + id[5] + "%22%2C%22withCommunity%22%3Afalse%2C%22includePromotedContent%22%3Afalse%2C%22withVoice%22%3Afalse%7D&features=%7B%22creator_subscriptions_tweet_preview_api_enabled%22%3Atrue%2C%22communities_web_enable_tweet_community_results_fetch%22%3Atrue%2C%22c9s_tweet_anatomy_moderator_badge_enabled%22%3Atrue%2C%22articles_preview_enabled%22%3Atrue%2C%22responsive_web_edit_tweet_api_enabled%22%3Atrue%2C%22graphql_is_translatable_rweb_tweet_is_translatable_enabled%22%3Atrue%2C%22view_counts_everywhere_api_enabled%22%3Atrue%2C%22longform_notetweets_consumption_enabled%22%3Atrue%2C%22responsive_web_twitter_article_tweet_consumption_enabled%22%3Atrue%2C%22tweet_awards_web_tipping_enabled%22%3Afalse%2C%22creator_subscriptions_quote_tweet_preview_enabled%22%3Afalse%2C%22freedom_of_speech_not_reach_fetch_enabled%22%3Atrue%2C%22standardized_nudges_misinfo%22%3Atrue%2C%22tweet_with_visibility_results_prefer_gql_limited_actions_policy_enabled%22%3Atrue%2C%22rweb_video_timestamps_enabled%22%3Atrue%2C%22longform_notetweets_rich_text_read_enabled%22%3Atrue%2C%22longform_notetweets_inline_media_enabled%22%3Atrue%2C%22rweb_tipjar_consumption_enabled%22%3Atrue%2C%22responsive_web_graphql_exclude_directive_enabled%22%3Atrue%2C%22verified_phone_label_enabled%22%3Afalse%2C%22responsive_web_graphql_skip_user_profile_image_extensions_enabled%22%3Afalse%2C%22responsive_web_graphql_timeline_navigation_enabled%22%3Atrue%2C%22responsive_web_enhance_cards_enabled%22%3Afalse%7D&fieldToggles=%7B%22withArticleRichContentState%22%3Atrue%2C%22withArticlePlainText%22%3Afalse%2C%22withGrokAnalyze%22%3Afalse%2C%22withDisallowedReplyControls%22%3Afalse%7D", id[5]
 }
 
-func MakeRequest(url string, GT string) {
+func MakeRequest(url string, GT string) string {
 
 	client := http.Client{}
 
@@ -61,13 +68,12 @@ func MakeRequest(url string, GT string) {
 
 	body, err := ioutil.ReadAll(res.Body)
 	if err != nil {
-		fmt.Println("Gövde okuma hatası:", err)
-		return
+		fmt.Println(err)
 	}
 
-	// Yanıtı yazdırma
-	fmt.Println("Yanıt gövdesi:")
-	fmt.Println(string(body))
+	vidURL := GetLinks(string(body))
+
+	return vidURL
 
 }
 
@@ -95,4 +101,41 @@ func CreateGuestToken() string {
 	json.NewDecoder(res.Body).Decode(&gt)
 
 	return gt.GT
+}
+
+func GetLinks(jsonObj string) string {
+
+	pattern := `https:\/\/video\.twimg\.com\/ext_tw_video\/\d+\/pu\/vid\/[a-z0-9]+\/\d+x\d+\/[a-zA-Z0-9-]+\.mp4\?tag=\d+`
+	re := regexp.MustCompile(pattern)
+	urlStrings := re.FindAllString(jsonObj, 4)
+	return urlStrings[len(urlStrings)-1]
+}
+
+func SaveFile(fileName, vidURL string) {
+	client := http.Client{}
+
+	req, err := http.NewRequest("GET", vidURL, nil)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+	res, err := client.Do(req)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	body, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	file, err := os.Create(fileName + ".mp4")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	defer file.Close()
+
+	file.WriteString(string(body))
 }
